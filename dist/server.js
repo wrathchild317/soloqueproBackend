@@ -48,9 +48,16 @@ var port = 8080;
 var url = 'http://localhost:' + port + '/';
 _es6Promise2.default.polyfill();
 
-server.listen(port);
-console.log("Express server listening on port " + port);
-console.log(url);
+server.listen(port, function (error) {
+    if (error) {
+        console.error("Unable to listen on port", port, error);
+        listen(port + 1);
+    } else {
+        console.log("Express server listening on port " + port);
+        console.log(url);
+    }
+    return;
+});
 
 app.get('/', function (req, res) {
     res.json({
