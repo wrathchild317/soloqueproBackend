@@ -1,5 +1,5 @@
 export default {
-	key: 'RGAPI-1bfa1a5c-6125-4674-aa73-ec3666108e4c',
+	key: 'RGAPI-98ea8fb3-41cc-47b1-a5af-59eec2e77e6e',
 	baseUrl: 'https://na1.api.riotgames.com',
 	apis: {
 		summonerv3: {
@@ -48,6 +48,16 @@ export default {
 			getPositionsBySummonerId: {
 				url: '/lol/league/v3/positions/by-summoner/:summonerId',
 				fetchUrl: ['/lol/league/v3/positions/by-summoner/']
+			}
+		},
+		staticDatav3: {
+			getAllChampions: {
+				url: '/lol/static-data/v3/champions',
+				fetchUrl: ['/lol/static-data/v3/champions/']
+			},
+			getChampionById: {
+				url: '/lol/static-data/v3/champions/:championId',
+				fetchUrl: ['/lol/static-data/v3/champions/']
 			}
 		}
 	}
