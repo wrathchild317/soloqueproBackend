@@ -32,6 +32,10 @@ var _RiotFetch = require('./RiotAPI/RiotFetch');
 
 var _RiotFetch2 = _interopRequireDefault(_RiotFetch);
 
+var _formatQueries = require('./RiotAPI/formatQueries');
+
+var _formatQueries2 = _interopRequireDefault(_formatQueries);
+
 var _HandleExceptions = require('./errors/HandleExceptions');
 
 var _HandleExceptions2 = _interopRequireDefault(_HandleExceptions);
@@ -84,7 +88,7 @@ app.get(_RiotAPI2.default.apis.summonerv3.getBySummonerId.url, function (req, re
 
 /*------------------Champion Data------------------*/
 app.get(_RiotAPI2.default.apis.championv3.getAllChampions.url, function (req, res) {
-    var url = _RiotAPI2.default.baseUrl + _RiotAPI2.default.apis.championv3.getAllChampions.fetchUrl + '?freeToPlay=' + req.query.freeToPlay + '&api_key=' + _RiotAPI2.default.key;
+    var url = _RiotAPI2.default.baseUrl + _RiotAPI2.default.apis.championv3.getAllChampions.fetchUrl + '?' + (0, _formatQueries2.default)(req.query) + 'api_key=' + _RiotAPI2.default.key;
     (0, _RiotFetch2.default)(url, res);
 });
 
@@ -119,6 +123,17 @@ app.get(_RiotAPI2.default.apis.leaguev3.getLeaguesBySummonerId.url, function (re
 
 app.get(_RiotAPI2.default.apis.leaguev3.getPositionsBySummonerId.url, function (req, res) {
     var url = _RiotAPI2.default.baseUrl + _RiotAPI2.default.apis.leaguev3.getPositionsBySummonerId.fetchUrl + req.params.summonerId + '?api_key=' + _RiotAPI2.default.key;
+    (0, _RiotFetch2.default)(url, res);
+});
+
+/*----------------Static Data-----------------------*/
+app.get(_RiotAPI2.default.apis.staticDatav3.getAllChampions.url, function (req, res) {
+    var url = _RiotAPI2.default.baseUrl + _RiotAPI2.default.apis.staticDatav3.getAllChampions.fetchUrl + '?' + (0, _formatQueries2.default)(req.query) + 'api_key=' + _RiotAPI2.default.key;
+    (0, _RiotFetch2.default)(url, res);
+});
+
+app.get(_RiotAPI2.default.apis.staticDatav3.getChampionById.url, function (req, res) {
+    var url = _RiotAPI2.default.baseUrl + _RiotAPI2.default.apis.staticDatav3.getChampionById.fetchUrl + req.params.championId + '?' + (0, _formatQueries2.default)(req.query) + 'api_key=' + _RiotAPI2.default.key;
     (0, _RiotFetch2.default)(url, res);
 });
 

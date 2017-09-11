@@ -8,6 +8,7 @@ import fetch from 'isomorphic-fetch';
 import RiotAPI from './RiotAPI';
 import RiotError from './errors/RiotError';
 import riotFetch from './RiotAPI/RiotFetch';
+import formatQueries from './RiotAPI/formatQueries';
 import HandleExceptions from './errors/HandleExceptions';
 
 //HandleExceptions();
@@ -61,7 +62,7 @@ app.get(RiotAPI.apis.summonerv3.getBySummonerId.url, (req, res) => {
 /*------------------Champion Data------------------*/
 app.get(RiotAPI.apis.championv3.getAllChampions.url, (req, res) => {
      var url = RiotAPI.baseUrl + RiotAPI.apis.championv3.getAllChampions.fetchUrl
-              + '?freeToPlay=' + req.query.freeToPlay + '&api_key=' + RiotAPI.key;
+              + '?' + formatQueries(req.query) + 'api_key=' + RiotAPI.key;
     riotFetch(url, res);
 });
 
@@ -103,6 +104,22 @@ app.get(RiotAPI.apis.leaguev3.getLeaguesBySummonerId.url, (req, res) => {
 app.get(RiotAPI.apis.leaguev3.getPositionsBySummonerId.url, (req, res) => {
      var url = RiotAPI.baseUrl + RiotAPI.apis.leaguev3.getPositionsBySummonerId.fetchUrl
               + req.params.summonerId + '?api_key=' + RiotAPI.key;
+    riotFetch(url, res);
+});
+
+
+/*----------------Static Data-----------------------*/
+app.get(RiotAPI.apis.staticDatav3.getAllChampions.url, (req, res) => {
+    var url = RiotAPI.baseUrl + RiotAPI.apis.staticDatav3.getAllChampions.fetchUrl
+              + '?' + formatQueries(req.query) +  'api_key=' + RiotAPI.key;
+    riotFetch(url, res);
+});
+
+
+app.get(RiotAPI.apis.staticDatav3.getChampionById.url, (req, res) => {
+    var url = RiotAPI.baseUrl + RiotAPI.apis.staticDatav3.getChampionById.fetchUrl
+              + req.params.championId + '?' + formatQueries(req.query) + 'api_key=' 
+              + RiotAPI.key;
     riotFetch(url, res);
 });
 
