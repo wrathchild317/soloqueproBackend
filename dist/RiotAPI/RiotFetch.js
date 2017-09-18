@@ -4,8 +4,8 @@ Object.defineProperty(exports, "__esModule", {
     value: true
 });
 
-exports.default = function (url, res) {
-    fetch(url).then(function (response) {
+exports.default = function (url, done) {
+    return fetch(url).then(function (response) {
         var status = response.status;
         if (status >= 400) {
             var error = {
@@ -19,6 +19,6 @@ exports.default = function (url, res) {
 
         return response.json();
     }).then(function (data) {
-        res.json(data);
+        done(data);
     });
 };

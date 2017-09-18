@@ -1,5 +1,5 @@
 export default {
-	key: 'RGAPI-98ea8fb3-41cc-47b1-a5af-59eec2e77e6e',
+	key: 'RGAPI-258466f1-f73b-4c25-8f12-3c9508f0ba40',
 	baseUrl: 'https://na1.api.riotgames.com',
 	apis: {
 		summonerv3: {
@@ -58,6 +58,10 @@ export default {
 			getChampionById: {
 				url: '/lol/static-data/v3/champions/:championId',
 				fetchUrl: ['/lol/static-data/v3/champions/']
+			},
+			realms: {
+				url: '/lol/static-data/v3/realms',
+				fetchUrl: ['/lol/static-data/v3/realms'],
 			}
 		}
 	}
