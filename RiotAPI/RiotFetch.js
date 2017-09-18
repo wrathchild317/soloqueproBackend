@@ -1,5 +1,5 @@
-export default function(url, res) {
-	fetch(url)
+export default function(url, done) {
+	return fetch(url)
       .then((response) => {
           var status = response.status;
           if (status >= 400) {
@@ -15,6 +15,6 @@ export default function(url, res) {
           return response.json();
       })
       .then((data) => {
-          res.json(data);
+          done(data);
       });
 }
