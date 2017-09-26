@@ -4,7 +4,7 @@ Object.defineProperty(exports, "__esModule", {
 	value: true
 });
 exports.default = {
-	key: 'RGAPI-258466f1-f73b-4c25-8f12-3c9508f0ba40',
+	key: 'RGAPI-21e46587-3ad3-4ea4-9c9d-4ff3061c1aed',
 	baseUrl: 'https://na1.api.riotgames.com',
 	apis: {
 		summonerv3: {
@@ -57,11 +57,11 @@ exports.default = {
 		},
 		staticDatav3: {
 			getAllChampions: {
-				url: '/lol/static-data/v3/champions',
+				url: '/lol/static-data/champions',
 				fetchUrl: ['/lol/static-data/v3/champions/']
 			},
 			getChampionById: {
-				url: '/lol/static-data/v3/champions/:championId',
+				url: '/lol/static-data/champions/:championId',
 				fetchUrl: ['/lol/static-data/v3/champions/']
 			},
 			realms: {
