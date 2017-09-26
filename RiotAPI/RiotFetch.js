@@ -1,4 +1,4 @@
-export default function(url, done) {
+export default function(url) {
 	return fetch(url)
       .then((response) => {
           var status = response.status;
@@ -8,13 +8,13 @@ export default function(url, done) {
           		url: url
           	};
 
-            console.log('Error - Riot API:')
+            console.log('Fetch Error:')
             console.log(error);
           }
 
           return response.json();
       })
-      .then((data) => {
-          done(data);
-      });
+      .catch((err) => {
+        console.log(err);
+      })
 }
