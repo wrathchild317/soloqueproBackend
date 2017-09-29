@@ -77,7 +77,7 @@ var url = 'http://localhost:' + port + '/';
 _es6Promise2.default.polyfill();
 
 var MongoClient = require('mongodb').MongoClient;
-var mongoUrl = "mongodb://localhost:27017/soloqueproDB";
+var mongoUrl = "mongodb://heroku_vxl19zxq:ea20n6rfisqse45k3nqf7hpu56@ds157624.mlab.com:57624/heroku_vxl19zxq";
 var testUrl = "mongodb://localhost:27017/soloqueproTestDB";
 
 if (testing) {

@@ -5,6 +5,12 @@
     "build": "rimraf dist/ && babel ./ --out-dir dist/ --ignore ./node_modules,./.babelrc,./package.json,./npm-debug.log --copy-files",
     "start": "npm run build && node dist/server.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wrathchild317/soloqueproBackend.git"
+  },
+  "license" : "BSD-3-Clause",
+  "description": "Backend for soloquepro",
   "version": "1.0.0",
   "dependencies": {
     "es6-promise": "^4.1.1",
