@@ -13,27 +13,39 @@ import formatQueries from './RiotAPI/formatQueries';
 import HandleExceptions from './errors/HandleExceptions';
 
 import _ from 'lodash';
+import striptags from 'striptags';
 
 import path from 'path';
 var appDir = path.dirname(require.main.filename);
 
 //HandleExceptions();
 
+//SET TRUE FOR TESTING
+var testing = false;
+
 //-------------------------Setup Server-----------------------------
 var app = express();
 var server = http.createServer(app);
 var io = socketio.listen(server);
 var port = 8080;
+var testPort = 8081;
 var url = 'http://localhost:' + port + '/';
 promise.polyfill();
 
 
 
+
 var MongoClient = require('mongodb').MongoClient;
-var url = "mongodb://localhost:27017/soloqueproDB";
+var mongoUrl = "mongodb://localhost:27017/soloqueproDB";
+var testUrl = "mongodb://localhost:27017/soloqueproTestDB";
+
+if (testing) {
+    port = testPort;
+    mongoUrl = testUrl;
+}
 
 
-MongoClient.connect(url, (err, db) => {
+MongoClient.connect(mongoUrl, (err, db) => {
     db.collection('realms').drop();
     db.collection('champions').drop();
 
@@ -54,7 +66,7 @@ MongoClient.connect(url, (err, db) => {
             riotFetch('http://loldata.services.zam.com/v1/champion')
                 .then((champions) => {
                     _.forEach(champions, (championData) => {
-                        const { spells, skins, passive } = championData;
+                        const { spells, skins, passive, blurb, lore } = championData;
                         const { n, cdn, v } = realmData
 
                         var championKey = (championData.key == 'Fiddlesticks') ? 'FiddleSticks' : championData.key;
@@ -64,6 +76,10 @@ MongoClient.connect(url, (err, db) => {
                                 //create champion square url 
                                 var championSquareUrl = cdn + '/' + n.champion + '/img/champion/' 
                                     + championData.key + '.png';
+
+                                //create tag image url
+                                var tagImageUrl = 'http://universe.leagueoflegends.com/images/role_icon_' 
+                                    + championData.tags[0].toLowerCase() + '.png'; 
 
                                 //create spells url
                                 var newSpells = _.map(spells, (spell) => {
@@ -81,7 +97,7 @@ MongoClient.connect(url, (err, db) => {
                                 //now create new urls
                                 newSkins = _.map(newSkins, (skin) => {
                                     var media = {
-                                        slash_url: cdn + '/img/champion/splash/' 
+                                        splash_url: cdn + '/img/champion/splash/' 
                                             + championData.key + '_' + skin.num  + '.jpg',
                                         loading_url: cdn + '/img/champion/loading/' 
                                             + championData.key + '_' + skin.num  + '.jpg'
@@ -89,6 +105,8 @@ MongoClient.connect(url, (err, db) => {
 
                                     return {...skin, media: media}
                                 });
+
+
 
                                 //input passive url
                                 var passive = riotData.data[championData.key].passive;
@@ -98,12 +116,20 @@ MongoClient.connect(url, (err, db) => {
                                     url: cdn + '/' + n.champion + '/img/passive/' + passive.image.full,
                                 }
 
+                                //sanatize blurb and lore 
+
+                                var sanitizedLore = striptags(lore, [], '\n').replace(/['"]+/g, '');
+                                var sanitizedBlurb = striptags(blurb, [], '\n').replace(/['"]+/g, '');
+
                                 var champion = {
                                     ...championData,
                                     passive: newPassive,
                                     skins: newSkins,
                                     spells: newSpells,
                                     champion_square_url: championSquareUrl,
+                                    lore: sanitizedLore,
+                                    blurb: sanitizedBlurb,
+                                    tag_image_url: tagImageUrl,
                                 }
 
                                 championsDB.insertOne(champion, (err, res) => {

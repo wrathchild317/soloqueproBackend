@@ -50,6 +50,10 @@ var _lodash = require('lodash');
 
 var _lodash2 = _interopRequireDefault(_lodash);
 
+var _striptags = require('striptags');
+
+var _striptags2 = _interopRequireDefault(_striptags);
+
 var _path = require('path');
 
 var _path2 = _interopRequireDefault(_path);
@@ -60,18 +64,28 @@ var appDir = _path2.default.dirname(require.main.filename);
 
 //HandleExceptions();
 
+//SET TRUE FOR TESTING
+var testing = false;
+
 //-------------------------Setup Server-----------------------------
 var app = (0, _express2.default)();
 var server = _http2.default.createServer(app);
 var io = _socket2.default.listen(server);
 var port = 8080;
+var testPort = 8081;
 var url = 'http://localhost:' + port + '/';
 _es6Promise2.default.polyfill();
 
 var MongoClient = require('mongodb').MongoClient;
-var url = "mongodb://localhost:27017/soloqueproDB";
+var mongoUrl = "mongodb://localhost:27017/soloqueproDB";
+var testUrl = "mongodb://localhost:27017/soloqueproTestDB";
 
-MongoClient.connect(url, function (err, db) {
+if (testing) {
+    port = testPort;
+    mongoUrl = testUrl;
+}
+
+MongoClient.connect(mongoUrl, function (err, db) {
     db.collection('realms').drop();
     db.collection('champions').drop();
 
@@ -91,7 +105,9 @@ MongoClient.connect(url, function (err, db) {
             _lodash2.default.forEach(champions, function (championData) {
                 var spells = championData.spells,
                     skins = championData.skins,
-                    passive = championData.passive;
+                    passive = championData.passive,
+                    blurb = championData.blurb,
+                    lore = championData.lore;
                 var n = realmData.n,
                     cdn = realmData.cdn,
                     v = realmData.v;
@@ -102,6 +118,9 @@ MongoClient.connect(url, function (err, db) {
                 (0, _RiotFetch2.default)(cdn + '/' + v + '/data/en_US/champion/' + championKey + '.json').then(function (riotData) {
                     //create champion square url 
                     var championSquareUrl = cdn + '/' + n.champion + '/img/champion/' + championData.key + '.png';
+
+                    //create tag image url
+                    var tagImageUrl = 'http://universe.leagueoflegends.com/images/role_icon_' + championData.tags[0].toLowerCase() + '.png';
 
                     //create spells url
                     var newSpells = _lodash2.default.map(spells, function (spell) {
@@ -118,7 +137,7 @@ MongoClient.connect(url, function (err, db) {
                     //now create new urls
                     newSkins = _lodash2.default.map(newSkins, function (skin) {
                         var media = {
-                            slash_url: cdn + '/img/champion/splash/' + championData.key + '_' + skin.num + '.jpg',
+                            splash_url: cdn + '/img/champion/splash/' + championData.key + '_' + skin.num + '.jpg',
                             loading_url: cdn + '/img/champion/loading/' + championData.key + '_' + skin.num + '.jpg'
                         };
 
@@ -131,13 +150,20 @@ MongoClient.connect(url, function (err, db) {
                         name: passive.name,
                         description: passive.description,
                         url: cdn + '/' + n.champion + '/img/passive/' + passive.image.full
-                    };
+
+                        //sanatize blurb and lore 
+
+                    };var sanitizedLore = (0, _striptags2.default)(lore, [], '\n').replace(/['"]+/g, '');
+                    var sanitizedBlurb = (0, _striptags2.default)(blurb, [], '\n').replace(/['"]+/g, '');
 
                     var champion = _extends({}, championData, {
                         passive: newPassive,
                         skins: newSkins,
                         spells: newSpells,
-                        champion_square_url: championSquareUrl
+                        champion_square_url: championSquareUrl,
+                        lore: sanitizedLore,
+                        blurb: sanitizedBlurb,
+                        tag_image_url: tagImageUrl
                     });
 
                     championsDB.insertOne(champion, function (err, res) {
