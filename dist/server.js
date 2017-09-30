@@ -71,7 +71,7 @@ var testing = false;
 var app = (0, _express2.default)();
 var server = _http2.default.createServer(app);
 var io = _socket2.default.listen(server);
-var port = 8080;
+var port = process.env.PORT || 3000;
 var testPort = 8081;
 var url = 'http://localhost:' + port + '/';
 _es6Promise2.default.polyfill();
