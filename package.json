@@ -3,7 +3,7 @@
   "author": "Angel Rivera",
   "scripts": {
     "build": "rimraf dist/ && babel ./ --out-dir dist/ --ignore ./node_modules,./.babelrc,./package.json,./npm-debug.log --copy-files",
-    "start": "npm run build && node dist/server.js"
+    "start": "node dist/server.js"
   },
   "repository": {
     "type": "git",
