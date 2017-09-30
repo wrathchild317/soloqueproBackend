@@ -21,7 +21,7 @@ var appDir = path.dirname(require.main.filename);
 //HandleExceptions();
 
 //SET TRUE FOR TESTING
-var testing = false;
+var testing = true;
 
 //-------------------------Setup Server-----------------------------
 var app = express();
@@ -114,8 +114,6 @@ MongoClient.connect(mongoUrl, (err, db) => {
 
 
 MongoClient.connect(mongoUrl, (err, db) => {
-    db.collection('realms').drop();
-    db.collection('champions').drop();
 
     if (err) throw err;
     var realmsDB = db.collection('realms');
@@ -200,10 +198,19 @@ MongoClient.connect(mongoUrl, (err, db) => {
                                     tag_image_url: tagImageUrl,
                                 }
 
-                                championsDB.insertOne(champion, (err, res) => {
-                                    if (err) throw err;
-                                    console.log('champion ' + champion.key + ' added to db');
-                                })
+                                var championExists = championsDB.find({champion_id: champion.champion_id});
+
+                                if(championExists){
+                                    //champion is already in database so update
+                                    championsDB.update({champion_id: champion.champion_id}, {...champion});
+                                    console.log('champion ' + champion.key + ' updated');
+
+                                } else {
+                                    championsDB.insertOne(champion, (err, res) => {
+                                        if (err) throw err;
+                                        console.log('champion ' + champion.key + ' added to db');
+                                    });
+                                }
                             });
 
                     });
