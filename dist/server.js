@@ -65,7 +65,7 @@ var appDir = _path2.default.dirname(require.main.filename);
 //HandleExceptions();
 
 //SET TRUE FOR TESTING
-var testing = true;
+var testing = false;
 
 //-------------------------Setup Server-----------------------------
 var app = (0, _express2.default)();
@@ -228,8 +228,7 @@ MongoClient.connect(mongoUrl, function (err, db) {
                         champion_square_url: championSquareUrl,
                         lore: sanitizedLore,
                         blurb: sanitizedBlurb,
-                        tag_image_url: tagImageUrl,
-                        death: true
+                        tag_image_url: tagImageUrl
                     });
 
                     var championExists = championsDB.find({ champion_id: champion.champion_id });
