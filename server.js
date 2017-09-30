@@ -46,6 +46,74 @@ if (testing) {
 
 
 MongoClient.connect(mongoUrl, (err, db) => {
+    server.listen(port, function(error) {
+        if (error) {
+          console.error("Unable to listen on port", port, error);
+          listen(port + 1);
+        } else{
+          console.log("Express server listening on port " + port);
+          console.log(url);
+        }
+        return;
+    });
+
+    app.get('/', (req, res) => {
+        res.json({
+          greeting: 'Welcome to SoloQuePro!'
+        });
+    });
+
+
+    app.get(RiotAPI.apis.staticDatav3.getChampionById.url, (req, res) => {
+        const { fields } = req.query;
+
+        var championFields = (fields) ? fields.split(',') : {};
+
+        championFields = _.reduce(championFields, (acc, field) => {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        var championId = parseInt(req.params.championId);
+        db.collection('champions').findOne({champion_id: championId,}, championFields, (err, champion) => {
+            (champion) ? res.json(champion) :  res.status(500).send('Champion Not Found');
+        });
+
+    });
+
+    app.get(RiotAPI.apis.staticDatav3.getAllChampions.url, (req, res) => {
+        const { fields, in_rotation, sort } = req.query;
+
+
+        var query = (in_rotation) ? {in_rotation: in_rotation === 'true'} : {};
+        var championFields = (fields) ? fields.split(',') : [];
+        var sortFields = (sort) ? sort.split(',') : [];
+
+        championFields = _.reduce(championFields, (acc, field) => {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        sortFields = _.reduce(sortFields, (acc, field) => {
+            if(field.charAt(0) == '-') {
+                field = field.substr(1);
+                acc[field] = -1;
+            } else {
+                acc[field] = 1;
+            }
+            return acc;
+        }, {});
+
+        db.collection('champions').find(query, championFields). sort(sortFields)
+            .toArray((err, champions) => {
+                (champions) ? res.json(champions) :  res.status(500).send('Internal Server Error');
+            });
+
+    });
+});
+
+
+MongoClient.connect(mongoUrl, (err, db) => {
     db.collection('realms').drop();
     db.collection('champions').drop();
 
@@ -142,70 +210,6 @@ MongoClient.connect(mongoUrl, (err, db) => {
                 });
         });
 
-        server.listen(port, function(error) {
-            if (error) {
-              console.error("Unable to listen on port", port, error);
-              listen(port + 1);
-            } else{
-              console.log("Express server listening on port " + port);
-              console.log(url);
-            }
-            return;
-        });
-
-        app.get('/', (req, res) => {
-            res.json({
-              greeting: 'Welcome to SoloQuePro!'
-            });
-        });
-
-
-        app.get(RiotAPI.apis.staticDatav3.getChampionById.url, (req, res) => {
-            const { fields } = req.query;
-
-            var championFields = (fields) ? fields.split(',') : {};
-
-            championFields = _.reduce(championFields, (acc, field) => {
-                acc[field] = true;
-                return acc;
-            }, {});
-
-            var championId = parseInt(req.params.championId);
-            db.collection('champions').findOne({champion_id: championId,}, championFields, (err, champion) => {
-                (champion) ? res.json(champion) :  res.status(500).send('Champion Not Found');
-            });
-
-        });
-
-        app.get(RiotAPI.apis.staticDatav3.getAllChampions.url, (req, res) => {
-            const { fields, in_rotation, sort } = req.query;
-
-
-            var query = (in_rotation) ? {in_rotation: in_rotation === 'true'} : {};
-            var championFields = (fields) ? fields.split(',') : [];
-            var sortFields = (sort) ? sort.split(',') : [];
-
-            championFields = _.reduce(championFields, (acc, field) => {
-                acc[field] = true;
-                return acc;
-            }, {});
-
-            sortFields = _.reduce(sortFields, (acc, field) => {
-                if(field.charAt(0) == '-') {
-                    field = field.substr(1);
-                    acc[field] = -1;
-                } else {
-                    acc[field] = 1;
-                }
-                return acc;
-            }, {});
-
-            db.collection('champions').find(query, championFields). sort(sortFields)
-                .toArray((err, champions) => {
-                    (champions) ? res.json(champions) :  res.status(500).send('Internal Server Error');
-                });
-
-        });
 
 });
 
