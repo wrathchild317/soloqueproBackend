@@ -21,7 +21,7 @@ var appDir = path.dirname(require.main.filename);
 //HandleExceptions();
 
 //SET TRUE FOR TESTING
-var testing = true;
+var testing = false;
 
 //-------------------------Setup Server-----------------------------
 var app = express();
