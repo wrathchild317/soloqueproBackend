@@ -27,7 +27,7 @@ var testing = false;
 var app = express();
 var server = http.createServer(app);
 var io = socketio.listen(server);
-var port = 8080;
+var port = process.env.PORT || 3000;
 var testPort = 8081;
 var url = 'http://localhost:' + port + '/';
 promise.polyfill();
