@@ -65,7 +65,7 @@ var appDir = _path2.default.dirname(require.main.filename);
 //HandleExceptions();
 
 //SET TRUE FOR TESTING
-var testing = false;
+var testing = true;
 
 //-------------------------Setup Server-----------------------------
 var app = (0, _express2.default)();
@@ -86,8 +86,73 @@ if (testing) {
 }
 
 MongoClient.connect(mongoUrl, function (err, db) {
-    db.collection('realms').drop();
-    db.collection('champions').drop();
+    server.listen(port, function (error) {
+        if (error) {
+            console.error("Unable to listen on port", port, error);
+            listen(port + 1);
+        } else {
+            console.log("Express server listening on port " + port);
+            console.log(url);
+        }
+        return;
+    });
+
+    app.get('/', function (req, res) {
+        res.json({
+            greeting: 'Welcome to SoloQuePro!'
+        });
+    });
+
+    app.get(_RiotAPI2.default.apis.staticDatav3.getChampionById.url, function (req, res) {
+        var fields = req.query.fields;
+
+
+        var championFields = fields ? fields.split(',') : {};
+
+        championFields = _lodash2.default.reduce(championFields, function (acc, field) {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        var championId = parseInt(req.params.championId);
+        db.collection('champions').findOne({ champion_id: championId }, championFields, function (err, champion) {
+            champion ? res.json(champion) : res.status(500).send('Champion Not Found');
+        });
+    });
+
+    app.get(_RiotAPI2.default.apis.staticDatav3.getAllChampions.url, function (req, res) {
+        var _req$query = req.query,
+            fields = _req$query.fields,
+            in_rotation = _req$query.in_rotation,
+            sort = _req$query.sort;
+
+
+        var query = in_rotation ? { in_rotation: in_rotation === 'true' } : {};
+        var championFields = fields ? fields.split(',') : [];
+        var sortFields = sort ? sort.split(',') : [];
+
+        championFields = _lodash2.default.reduce(championFields, function (acc, field) {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        sortFields = _lodash2.default.reduce(sortFields, function (acc, field) {
+            if (field.charAt(0) == '-') {
+                field = field.substr(1);
+                acc[field] = -1;
+            } else {
+                acc[field] = 1;
+            }
+            return acc;
+        }, {});
+
+        db.collection('champions').find(query, championFields).sort(sortFields).toArray(function (err, champions) {
+            champions ? res.json(champions) : res.status(500).send('Internal Server Error');
+        });
+    });
+});
+
+MongoClient.connect(mongoUrl, function (err, db) {
 
     if (err) throw err;
     var realmsDB = db.collection('realms');
@@ -163,80 +228,24 @@ MongoClient.connect(mongoUrl, function (err, db) {
                         champion_square_url: championSquareUrl,
                         lore: sanitizedLore,
                         blurb: sanitizedBlurb,
-                        tag_image_url: tagImageUrl
+                        tag_image_url: tagImageUrl,
+                        death: true
                     });
 
-                    championsDB.insertOne(champion, function (err, res) {
-                        if (err) throw err;
-                        console.log('champion ' + champion.key + ' added to db');
-                    });
+                    var championExists = championsDB.find({ champion_id: champion.champion_id });
+
+                    if (championExists) {
+                        //champion is already in database so update
+                        championsDB.update({ champion_id: champion.champion_id }, _extends({}, champion));
+                        console.log('champion ' + champion.key + ' updated');
+                    } else {
+                        championsDB.insertOne(champion, function (err, res) {
+                            if (err) throw err;
+                            console.log('champion ' + champion.key + ' added to db');
+                        });
+                    }
                 });
             });
-        });
-    });
-
-    server.listen(port, function (error) {
-        if (error) {
-            console.error("Unable to listen on port", port, error);
-            listen(port + 1);
-        } else {
-            console.log("Express server listening on port " + port);
-            console.log(url);
-        }
-        return;
-    });
-
-    app.get('/', function (req, res) {
-        res.json({
-            greeting: 'Welcome to SoloQuePro!'
-        });
-    });
-
-    app.get(_RiotAPI2.default.apis.staticDatav3.getChampionById.url, function (req, res) {
-        var fields = req.query.fields;
-
-
-        var championFields = fields ? fields.split(',') : {};
-
-        championFields = _lodash2.default.reduce(championFields, function (acc, field) {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-        var championId = parseInt(req.params.championId);
-        db.collection('champions').findOne({ champion_id: championId }, championFields, function (err, champion) {
-            champion ? res.json(champion) : res.status(500).send('Champion Not Found');
-        });
-    });
-
-    app.get(_RiotAPI2.default.apis.staticDatav3.getAllChampions.url, function (req, res) {
-        var _req$query = req.query,
-            fields = _req$query.fields,
-            in_rotation = _req$query.in_rotation,
-            sort = _req$query.sort;
-
-
-        var query = in_rotation ? { in_rotation: in_rotation === 'true' } : {};
-        var championFields = fields ? fields.split(',') : [];
-        var sortFields = sort ? sort.split(',') : [];
-
-        championFields = _lodash2.default.reduce(championFields, function (acc, field) {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-        sortFields = _lodash2.default.reduce(sortFields, function (acc, field) {
-            if (field.charAt(0) == '-') {
-                field = field.substr(1);
-                acc[field] = -1;
-            } else {
-                acc[field] = 1;
-            }
-            return acc;
-        }, {});
-
-        db.collection('champions').find(query, championFields).sort(sortFields).toArray(function (err, champions) {
-            champions ? res.json(champions) : res.status(500).send('Internal Server Error');
         });
     });
 });
