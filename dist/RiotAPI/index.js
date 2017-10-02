@@ -67,6 +67,12 @@ exports.default = {
 			realms: {
 				url: '/lol/static-data/v3/realms',
 				fetchUrl: ['/lol/static-data/v3/realms']
+			},
+			getAllItems: {
+				url: '/lol/static-data/items'
+			},
+			getItemById: {
+				url: '/lol/static-data/items/:itemId'
 			}
 		}
 	}

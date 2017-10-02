@@ -21,7 +21,7 @@ var appDir = path.dirname(require.main.filename);
 //HandleExceptions();
 
 //SET TRUE FOR TESTING
-var testing = false;
+var testing = true;
 
 //-------------------------Setup Server-----------------------------
 var app = express();
@@ -76,6 +76,7 @@ MongoClient.connect(mongoUrl, (err, db) => {
 
         var championId = parseInt(req.params.championId);
         db.collection('champions').findOne({champion_id: championId,}, championFields, (err, champion) => {
+            if (err) throw err;
             (champion) ? res.json(champion) :  res.status(500).send('Champion Not Found');
         });
 
@@ -106,8 +107,57 @@ MongoClient.connect(mongoUrl, (err, db) => {
 
         db.collection('champions').find(query, championFields). sort(sortFields)
             .toArray((err, champions) => {
+                if (err) throw err;
                 (champions) ? res.json(champions) :  res.status(500).send('Internal Server Error');
             });
+
+    });
+
+    app.get(RiotAPI.apis.staticDatav3.getAllItems.url, (req, res) => {
+        const { fields, sort } = req.query;
+
+        var itemFields = (fields) ? fields.split(',') : [];
+        var sortFields = (sort) ? sort.split(',') : [];
+
+        itemFields = _.reduce(itemFields, (acc, field) => {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        sortFields = _.reduce(sortFields, (acc, field) => {
+            if(field.charAt(0) == '-') {
+                field = field.substr(1);
+                acc[field] = -1;
+            } else {
+                acc[field] = 1;
+            }
+            return acc;
+        }, {});
+
+        db.collection('items').find({}, itemFields).sort(sortFields)
+            .toArray((err, items) => {
+                if (err) throw err;
+                (items) ? res.json(items) :  res.status(500).send('Internal Server Error');
+            });
+
+    });
+
+    app.get(RiotAPI.apis.staticDatav3.getItemById.url, (req, res) => {
+        const { fields } = req.query;
+
+        var itemFields = (fields) ? fields.split(',') : [];
+
+        itemFields = _.reduce(itemFields, (acc, field) => {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+
+        var itemId = parseInt(req.params.itemId);
+        db.collection('items').findOne({item_id: itemId,}, itemFields, (err, item) => {
+            if (err) throw err;
+            (item) ? res.json(item) :  res.status(500).send('Item Not Found');
+        });
 
     });
 });
@@ -118,6 +168,8 @@ MongoClient.connect(mongoUrl, (err, db) => {
     if (err) throw err;
     var realmsDB = db.collection('realms');
     var championsDB = db.collection('champions');
+    var itemsDB = db.collection('items');
+
     riotFetch('https://ddragon.leagueoflegends.com/realms/na.json')
         .then((data) => {
             realmsDB.insertOne(data, (err, res) => {
@@ -129,11 +181,11 @@ MongoClient.connect(mongoUrl, (err, db) => {
         })
         .then((realmData) => {
             //get champion info
+            const { n, cdn, v } = realmData
             riotFetch('http://loldata.services.zam.com/v1/champion')
                 .then((champions) => {
                     _.forEach(champions, (championData) => {
                         const { spells, skins, passive, blurb, lore } = championData;
-                        const { n, cdn, v } = realmData
 
                         var championKey = (championData.key == 'Fiddlesticks') ? 'FiddleSticks' : championData.key;
 
@@ -198,26 +250,57 @@ MongoClient.connect(mongoUrl, (err, db) => {
                                     tag_image_url: tagImageUrl,
                                 }
 
-                                var championExists = championsDB.find({champion_id: champion.champion_id});
-
-                                if(championExists){
-                                    //champion is already in database so update
-                                    championsDB.update({champion_id: champion.champion_id}, {...champion});
-                                    console.log('champion ' + champion.key + ' updated');
-
-                                } else {
-                                    championsDB.insertOne(champion, (err, res) => {
+                                championsDB.find({champion_id: champion.champion_id})
+                                    .toArray((err, championExists) => {
                                         if (err) throw err;
-                                        console.log('champion ' + champion.key + ' added to db');
+                                        if(championExists.length > 0){
+                                            //champion is already in database so update
+                                            championsDB.update({champion_id: champion.champion_id}, {...champion});
+                                            console.log('champion ' + champion.key + ' updated');
+
+                                        } else {
+                                            championsDB.insertOne(champion, (err, res) => {
+                                                if (err) throw err;
+                                                console.log('champion ' + champion.key + ' added to db');
+                                            });
+                                        }
                                     });
-                                }
                             });
 
                     });
                 });
+                riotFetch('http://loldata.services.zam.com/v1/item')
+                .then((items) => {
+                    _.forEach(items, (itemData) => {
+                        var itemSquareUrl = cdn + '/' + n.item + '/img/item/' 
+                                + itemData.item_id + '.png';
+                        
+                        var item = {
+                            ...itemData,
+                            item_square_url: itemSquareUrl,
+                        };
+
+                        itemsDB.find({item_id: item.item_id}).toArray((err, itemExists) => {
+                                if (err) throw err;
+
+                                if(itemExists.length > 0){
+                                //champion is already in database so update
+                                    itemsDB.update({item_id: item.item_id}, {...item});
+                                    console.log('Item ' + item.name + ' updated');
+                                } else {
+                                    if(item.name) {
+                                        itemsDB.insertOne(item, (err, res) => {
+                                            if (err) throw err;
+                                            console.log('Item ' + item.name + ' added to db');
+                                        });
+                                    }
+                                }
+                        });
+                    });
+                });
         });
 
-
+        
 });
 
 
