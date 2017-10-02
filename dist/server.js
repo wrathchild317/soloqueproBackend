@@ -65,7 +65,7 @@ var appDir = _path2.default.dirname(require.main.filename);
 //HandleExceptions();
 
 //SET TRUE FOR TESTING
-var testing = true;
+var testing = false;
 
 //-------------------------Setup Server-----------------------------
 var app = (0, _express2.default)();
