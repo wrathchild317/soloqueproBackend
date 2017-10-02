@@ -65,7 +65,7 @@ var appDir = _path2.default.dirname(require.main.filename);
 //HandleExceptions();
 
 //SET TRUE FOR TESTING
-var testing = false;
+var testing = true;
 
 //-------------------------Setup Server-----------------------------
 var app = (0, _express2.default)();
@@ -116,6 +116,7 @@ MongoClient.connect(mongoUrl, function (err, db) {
 
         var championId = parseInt(req.params.championId);
         db.collection('champions').findOne({ champion_id: championId }, championFields, function (err, champion) {
+            if (err) throw err;
             champion ? res.json(champion) : res.status(500).send('Champion Not Found');
         });
     });
@@ -147,7 +148,56 @@ MongoClient.connect(mongoUrl, function (err, db) {
         }, {});
 
         db.collection('champions').find(query, championFields).sort(sortFields).toArray(function (err, champions) {
+            if (err) throw err;
             champions ? res.json(champions) : res.status(500).send('Internal Server Error');
+        });
+    });
+
+    app.get(_RiotAPI2.default.apis.staticDatav3.getAllItems.url, function (req, res) {
+        var _req$query2 = req.query,
+            fields = _req$query2.fields,
+            sort = _req$query2.sort;
+
+
+        var itemFields = fields ? fields.split(',') : [];
+        var sortFields = sort ? sort.split(',') : [];
+
+        itemFields = _lodash2.default.reduce(itemFields, function (acc, field) {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        sortFields = _lodash2.default.reduce(sortFields, function (acc, field) {
+            if (field.charAt(0) == '-') {
+                field = field.substr(1);
+                acc[field] = -1;
+            } else {
+                acc[field] = 1;
+            }
+            return acc;
+        }, {});
+
+        db.collection('items').find({}, itemFields).sort(sortFields).toArray(function (err, items) {
+            if (err) throw err;
+            items ? res.json(items) : res.status(500).send('Internal Server Error');
+        });
+    });
+
+    app.get(_RiotAPI2.default.apis.staticDatav3.getItemById.url, function (req, res) {
+        var fields = req.query.fields;
+
+
+        var itemFields = fields ? fields.split(',') : [];
+
+        itemFields = _lodash2.default.reduce(itemFields, function (acc, field) {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        var itemId = parseInt(req.params.itemId);
+        db.collection('items').findOne({ item_id: itemId }, itemFields, function (err, item) {
+            if (err) throw err;
+            item ? res.json(item) : res.status(500).send('Item Not Found');
         });
     });
 });
@@ -157,6 +207,8 @@ MongoClient.connect(mongoUrl, function (err, db) {
     if (err) throw err;
     var realmsDB = db.collection('realms');
     var championsDB = db.collection('champions');
+    var itemsDB = db.collection('items');
+
     (0, _RiotFetch2.default)('https://ddragon.leagueoflegends.com/realms/na.json').then(function (data) {
         realmsDB.insertOne(data, function (err, res) {
             if (err) throw err;
@@ -166,6 +218,10 @@ MongoClient.connect(mongoUrl, function (err, db) {
         return data;
     }).then(function (realmData) {
         //get champion info
+        var n = realmData.n,
+            cdn = realmData.cdn,
+            v = realmData.v;
+
         (0, _RiotFetch2.default)('http://loldata.services.zam.com/v1/champion').then(function (champions) {
             _lodash2.default.forEach(champions, function (championData) {
                 var spells = championData.spells,
@@ -173,9 +229,6 @@ MongoClient.connect(mongoUrl, function (err, db) {
                     passive = championData.passive,
                     blurb = championData.blurb,
                     lore = championData.lore;
-                var n = realmData.n,
-                    cdn = realmData.cdn,
-                    v = realmData.v;
 
 
                 var championKey = championData.key == 'Fiddlesticks' ? 'FiddleSticks' : championData.key;
@@ -231,17 +284,44 @@ MongoClient.connect(mongoUrl, function (err, db) {
                         tag_image_url: tagImageUrl
                     });
 
-                    var championExists = championsDB.find({ champion_id: champion.champion_id });
+                    championsDB.find({ champion_id: champion.champion_id }).toArray(function (err, championExists) {
+                        if (err) throw err;
+                        if (championExists.length > 0) {
+                            //champion is already in database so update
+                            championsDB.update({ champion_id: champion.champion_id }, _extends({}, champion));
+                            console.log('champion ' + champion.key + ' updated');
+                        } else {
+                            championsDB.insertOne(champion, function (err, res) {
+                                if (err) throw err;
+                                console.log('champion ' + champion.key + ' added to db');
+                            });
+                        }
+                    });
+                });
+            });
+        });
+        (0, _RiotFetch2.default)('http://loldata.services.zam.com/v1/item').then(function (items) {
+            _lodash2.default.forEach(items, function (itemData) {
+                var itemSquareUrl = cdn + '/' + n.item + '/img/item/' + itemData.item_id + '.png';
 
-                    if (championExists) {
+                var item = _extends({}, itemData, {
+                    item_square_url: itemSquareUrl
+                });
+
+                itemsDB.find({ item_id: item.item_id }).toArray(function (err, itemExists) {
+                    if (err) throw err;
+
+                    if (itemExists.length > 0) {
                         //champion is already in database so update
-                        championsDB.update({ champion_id: champion.champion_id }, _extends({}, champion));
-                        console.log('champion ' + champion.key + ' updated');
+                        itemsDB.update({ item_id: item.item_id }, _extends({}, item));
+                        console.log('Item ' + item.name + ' updated');
                     } else {
-                        championsDB.insertOne(champion, function (err, res) {
-                            if (err) throw err;
-                            console.log('champion ' + champion.key + ' added to db');
-                        });
+                        if (item.name) {
+                            itemsDB.insertOne(item, function (err, res) {
+                                if (err) throw err;
+                                console.log('Item ' + item.name + ' added to db');
+                            });
+                        }
                     }
                 });
             });
