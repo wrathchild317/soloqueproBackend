@@ -73,6 +73,12 @@ exports.default = {
 			},
 			getItemById: {
 				url: '/lol/static-data/items/:itemId'
+			},
+			getAllMaps: {
+				url: '/lol/static-data/maps'
+			},
+			getMapById: {
+				url: '/lol/static-data/maps/:mapId'
 			}
 		}
 	}
