@@ -2,7 +2,6 @@ import express from 'express';
 import http from 'http';
 import socketio from 'socket.io';
 
-import fs from 'fs';
 import promise from 'es6-promise';
 import fetch from 'isomorphic-fetch';
 
@@ -10,15 +9,12 @@ import RiotAPI from './RiotAPI';
 import RiotError from './errors/RiotError';
 import riotFetch from './RiotAPI/RiotFetch';
 import formatQueries from './RiotAPI/formatQueries';
-import HandleExceptions from './errors/HandleExceptions';
 
 import _ from 'lodash';
 import striptags from 'striptags';
+import configs from './configs';
 
-import path from 'path';
-var appDir = path.dirname(require.main.filename);
 
-//HandleExceptions();
 
 //SET TRUE FOR TESTING
 var testing = false;
@@ -75,6 +71,7 @@ MongoClient.connect(mongoUrl, (err, db) => {
         }, {});
 
         var championId = parseInt(req.params.championId);
+
         db.collection('champions').findOne({champion_id: championId,}, championFields, (err, champion) => {
             if (err) throw err;
             (champion) ? res.json(champion) :  res.status(500).send('Champion Not Found');
@@ -114,10 +111,13 @@ MongoClient.connect(mongoUrl, (err, db) => {
     });
 
     app.get(RiotAPI.apis.staticDatav3.getAllItems.url, (req, res) => {
-        const { fields, sort } = req.query;
+        const { fields, sort, map } = req.query;
 
         var itemFields = (fields) ? fields.split(',') : [];
         var sortFields = (sort) ? sort.split(',') : [];
+        var mapQuery = {};
+
+        (map) ? mapQuery['maps.' + map] = true : null;
 
         itemFields = _.reduce(itemFields, (acc, field) => {
             acc[field] = true;
@@ -134,7 +134,7 @@ MongoClient.connect(mongoUrl, (err, db) => {
             return acc;
         }, {});
 
-        db.collection('items').find({}, itemFields).sort(sortFields)
+        db.collection('items').find(mapQuery, itemFields).sort(sortFields)
             .toArray((err, items) => {
                 if (err) throw err;
                 (items) ? res.json(items) :  res.status(500).send('Internal Server Error');
@@ -160,6 +160,54 @@ MongoClient.connect(mongoUrl, (err, db) => {
         });
 
     });
+
+    app.get(RiotAPI.apis.staticDatav3.getAllMaps.url, (req, res) => {
+        const { fields, sort, map } = req.query;
+
+        var mapFields = (fields) ? fields.split(',') : [];
+        var sortFields = (sort) ? sort.split(',') : [];
+
+        mapFields = _.reduce(mapFields, (acc, field) => {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        sortFields = _.reduce(sortFields, (acc, field) => {
+            if(field.charAt(0) == '-') {
+                field = field.substr(1);
+                acc[field] = -1;
+            } else {
+                acc[field] = 1;
+            }
+            return acc;
+        }, {});
+
+        db.collection('maps').find({}, mapFields).sort(sortFields)
+            .toArray((err, maps) => {
+                if (err) throw err;
+                (maps) ? res.json(maps) :  res.status(500).send('Internal Server Error');
+            });
+
+    });
+
+    app.get(RiotAPI.apis.staticDatav3.getMapById.url, (req, res) => {
+        const { fields } = req.query;
+
+        var mapFields = (fields) ? fields.split(',') : [];
+
+        mapFields = _.reduce(mapFields, (acc, field) => {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+
+        var mapId = req.params.mapId;
+        db.collection('maps').findOne({MapId: mapId,}, mapFields, (err, map) => {
+            if (err) throw err;
+            (map) ? res.json(map) :  res.status(500).send('Map Not Found');
+        });
+
+    });
 });
 
 
@@ -169,6 +217,7 @@ MongoClient.connect(mongoUrl, (err, db) => {
     var realmsDB = db.collection('realms');
     var championsDB = db.collection('champions');
     var itemsDB = db.collection('items');
+    var mapsDB = db.collection('maps');
 
     riotFetch('https://ddragon.leagueoflegends.com/realms/na.json')
         .then((data) => {
@@ -182,6 +231,7 @@ MongoClient.connect(mongoUrl, (err, db) => {
         .then((realmData) => {
             //get champion info
             const { n, cdn, v } = realmData
+            const mapUrl = cdn + '/' + n.map + '/data/en_US/map.json'; 
             riotFetch('http://loldata.services.zam.com/v1/champion')
                 .then((champions) => {
                     _.forEach(champions, (championData) => {
@@ -298,6 +348,34 @@ MongoClient.connect(mongoUrl, (err, db) => {
                         });
                     });
                 });
+                riotFetch(mapUrl)
+                    .then(({data: maps}) => {
+                        _.forEach(maps, (mapData) => {
+                            const { MapId } = mapData;
+
+                            var imgUrl = configs.map_media[MapId];
+
+                            var map = {
+                                ...mapData,
+                                img_url: imgUrl,
+                            }
+
+                            mapsDB.find({MapId: MapId}).toArray((err, mapExists) => {
+                                if (err) throw err;
+
+                                if(mapExists.length > 0){
+                                //champion is already in database so update
+                                    mapsDB.update({MapId: MapId}, {...map});
+                                    console.log('Map ' + map.MapName + ' updated');
+                                } else {
+                                    mapsDB.insertOne(map, (err, res) => {
+                                        if (err) throw err;
+                                        console.log('Map ' + map.MapName + ' added to db');
+                                    });
+                                }
+                            });
+                        });
+                    });
         });
 
         

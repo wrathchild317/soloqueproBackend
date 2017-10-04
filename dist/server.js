@@ -14,10 +14,6 @@ var _socket = require('socket.io');
 
 var _socket2 = _interopRequireDefault(_socket);
 
-var _fs = require('fs');
-
-var _fs2 = _interopRequireDefault(_fs);
-
 var _es6Promise = require('es6-promise');
 
 var _es6Promise2 = _interopRequireDefault(_es6Promise);
@@ -42,10 +38,6 @@ var _formatQueries = require('./RiotAPI/formatQueries');
 
 var _formatQueries2 = _interopRequireDefault(_formatQueries);
 
-var _HandleExceptions = require('./errors/HandleExceptions');
-
-var _HandleExceptions2 = _interopRequireDefault(_HandleExceptions);
-
 var _lodash = require('lodash');
 
 var _lodash2 = _interopRequireDefault(_lodash);
@@ -54,15 +46,11 @@ var _striptags = require('striptags');
 
 var _striptags2 = _interopRequireDefault(_striptags);
 
-var _path = require('path');
+var _configs = require('./configs');
 
-var _path2 = _interopRequireDefault(_path);
+var _configs2 = _interopRequireDefault(_configs);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var appDir = _path2.default.dirname(require.main.filename);
-
-//HandleExceptions();
 
 //SET TRUE FOR TESTING
 var testing = false;
@@ -115,6 +103,7 @@ MongoClient.connect(mongoUrl, function (err, db) {
         }, {});
 
         var championId = parseInt(req.params.championId);
+
         db.collection('champions').findOne({ champion_id: championId }, championFields, function (err, champion) {
             if (err) throw err;
             champion ? res.json(champion) : res.status(500).send('Champion Not Found');
@@ -156,11 +145,15 @@ MongoClient.connect(mongoUrl, function (err, db) {
     app.get(_RiotAPI2.default.apis.staticDatav3.getAllItems.url, function (req, res) {
         var _req$query2 = req.query,
             fields = _req$query2.fields,
-            sort = _req$query2.sort;
+            sort = _req$query2.sort,
+            map = _req$query2.map;
 
 
         var itemFields = fields ? fields.split(',') : [];
         var sortFields = sort ? sort.split(',') : [];
+        var mapQuery = {};
+
+        map ? mapQuery['maps.' + map] = true : null;
 
         itemFields = _lodash2.default.reduce(itemFields, function (acc, field) {
             acc[field] = true;
@@ -177,7 +170,7 @@ MongoClient.connect(mongoUrl, function (err, db) {
             return acc;
         }, {});
 
-        db.collection('items').find({}, itemFields).sort(sortFields).toArray(function (err, items) {
+        db.collection('items').find(mapQuery, itemFields).sort(sortFields).toArray(function (err, items) {
             if (err) throw err;
             items ? res.json(items) : res.status(500).send('Internal Server Error');
         });
@@ -200,6 +193,55 @@ MongoClient.connect(mongoUrl, function (err, db) {
             item ? res.json(item) : res.status(500).send('Item Not Found');
         });
     });
+
+    app.get(_RiotAPI2.default.apis.staticDatav3.getAllMaps.url, function (req, res) {
+        var _req$query3 = req.query,
+            fields = _req$query3.fields,
+            sort = _req$query3.sort,
+            map = _req$query3.map;
+
+
+        var mapFields = fields ? fields.split(',') : [];
+        var sortFields = sort ? sort.split(',') : [];
+
+        mapFields = _lodash2.default.reduce(mapFields, function (acc, field) {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        sortFields = _lodash2.default.reduce(sortFields, function (acc, field) {
+            if (field.charAt(0) == '-') {
+                field = field.substr(1);
+                acc[field] = -1;
+            } else {
+                acc[field] = 1;
+            }
+            return acc;
+        }, {});
+
+        db.collection('maps').find({}, mapFields).sort(sortFields).toArray(function (err, maps) {
+            if (err) throw err;
+            maps ? res.json(maps) : res.status(500).send('Internal Server Error');
+        });
+    });
+
+    app.get(_RiotAPI2.default.apis.staticDatav3.getMapById.url, function (req, res) {
+        var fields = req.query.fields;
+
+
+        var mapFields = fields ? fields.split(',') : [];
+
+        mapFields = _lodash2.default.reduce(mapFields, function (acc, field) {
+            acc[field] = true;
+            return acc;
+        }, {});
+
+        var mapId = req.params.mapId;
+        db.collection('maps').findOne({ MapId: mapId }, mapFields, function (err, map) {
+            if (err) throw err;
+            map ? res.json(map) : res.status(500).send('Map Not Found');
+        });
+    });
 });
 
 MongoClient.connect(mongoUrl, function (err, db) {
@@ -208,6 +250,7 @@ MongoClient.connect(mongoUrl, function (err, db) {
     var realmsDB = db.collection('realms');
     var championsDB = db.collection('champions');
     var itemsDB = db.collection('items');
+    var mapsDB = db.collection('maps');
 
     (0, _RiotFetch2.default)('https://ddragon.leagueoflegends.com/realms/na.json').then(function (data) {
         realmsDB.insertOne(data, function (err, res) {
@@ -222,6 +265,7 @@ MongoClient.connect(mongoUrl, function (err, db) {
             cdn = realmData.cdn,
             v = realmData.v;
 
+        var mapUrl = cdn + '/' + n.map + '/data/en_US/map.json';
         (0, _RiotFetch2.default)('http://loldata.services.zam.com/v1/champion').then(function (champions) {
             _lodash2.default.forEach(champions, function (championData) {
                 var spells = championData.spells,
@@ -322,6 +366,35 @@ MongoClient.connect(mongoUrl, function (err, db) {
                                 console.log('Item ' + item.name + ' added to db');
                             });
                         }
+                    }
+                });
+            });
+        });
+        (0, _RiotFetch2.default)(mapUrl).then(function (_ref) {
+            var maps = _ref.data;
+
+            _lodash2.default.forEach(maps, function (mapData) {
+                var MapId = mapData.MapId;
+
+
+                var imgUrl = _configs2.default.map_media[MapId];
+
+                var map = _extends({}, mapData, {
+                    img_url: imgUrl
+                });
+
+                mapsDB.find({ MapId: MapId }).toArray(function (err, mapExists) {
+                    if (err) throw err;
+
+                    if (mapExists.length > 0) {
+                        //champion is already in database so update
+                        mapsDB.update({ MapId: MapId }, _extends({}, map));
+                        console.log('Map ' + map.MapName + ' updated');
+                    } else {
+                        mapsDB.insertOne(map, function (err, res) {
+                            if (err) throw err;
+                            console.log('Map ' + map.MapName + ' added to db');
+                        });
                     }
                 });
             });
