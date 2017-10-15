@@ -215,17 +215,13 @@ MongoClient.connect(mongoUrl, (err, db) => {
 
     if (err) throw err;
     var realmsDB = db.collection('realms');
+    realmsDB.drop();
     var championsDB = db.collection('champions');
     var itemsDB = db.collection('items');
     var mapsDB = db.collection('maps');
 
     riotFetch('https://ddragon.leagueoflegends.com/realms/na.json')
         .then((data) => {
-            realmsDB.insertOne(data, (err, res) => {
-                if (err) throw err;
-                console.log("Realms data initialized");
-            });
-
             return data;
         })
         .then((realmData) => {
@@ -238,8 +234,10 @@ MongoClient.connect(mongoUrl, (err, db) => {
                         const { spells, skins, passive, blurb, lore } = championData;
 
                         var championKey = (championData.key == 'Fiddlesticks') ? 'FiddleSticks' : championData.key;
-
-                        riotFetch(cdn + '/' + v + '/data/en_US/champion/' + championKey + '.json')
+                        riotFetch('https://universe-meeps.leagueoflegends.com/v1/en_us/champions/'+ championKey.toLowerCase() +'/index.json')
+                        .then((universeData) => {
+                            const { 'release-date': release_date, video, } = universeData.champion;
+                            riotFetch(cdn + '/' + v + '/data/en_US/champion/' + championKey + '.json')
                             .then((riotData) => {
                                 //create champion square url 
                                 var championSquareUrl = cdn + '/' + n.champion + '/img/champion/' 
@@ -298,6 +296,8 @@ MongoClient.connect(mongoUrl, (err, db) => {
                                     lore: sanitizedLore,
                                     blurb: sanitizedBlurb,
                                     tag_image_url: tagImageUrl,
+                                    release_date: release_date,
+                                    video: video,
                                 }
 
                                 championsDB.find({champion_id: champion.champion_id})
@@ -316,38 +316,54 @@ MongoClient.connect(mongoUrl, (err, db) => {
                                         }
                                     });
                             });
+                        });
+                        
 
                     });
                 });
-                riotFetch('http://loldata.services.zam.com/v1/item')
-                .then((items) => {
-                    _.forEach(items, (itemData) => {
-                        var itemSquareUrl = cdn + '/' + n.item + '/img/item/' 
-                                + itemData.item_id + '.png';
-                        
-                        var item = {
-                            ...itemData,
-                            item_square_url: itemSquareUrl,
-                        };
+                riotFetch('http://ddragon.leagueoflegends.com/cdn/'+ n.item +'/data/en_US/item.json')
+                .then((itemsList) => {
 
-                        itemsDB.find({item_id: item.item_id}).toArray((err, itemExists) => {
-                                if (err) throw err;
+                    const { data: trueItems } = itemsList;
 
-                                if(itemExists.length > 0){
-                                //champion is already in database so update
-                                    itemsDB.update({item_id: item.item_id}, {...item});
-                                    console.log('Item ' + item.name + ' updated');
-                                } else {
-                                    if(item.name) {
-                                        itemsDB.insertOne(item, (err, res) => {
-                                            if (err) throw err;
-                                            console.log('Item ' + item.name + ' added to db');
-                                        });
+                    riotFetch('http://loldata.services.zam.com/v1/item')
+                    .then((items) => {
+                        _.forEach(items, (itemData) => {
+                            var itemSquareUrl = cdn + '/' + n.item + '/img/item/' 
+                                    + itemData.item_id + '.png';
+                            
+                            var item = {
+                                ...itemData,
+                                item_square_url: itemSquareUrl,
+                            };
+
+                            itemsDB.find({item_id: item.item_id}).toArray((err, itemExists) => {
+                                    if (err) throw err;
+
+                                    if(itemExists.length > 0){
+                                    //champion is already in database so update
+                                        if(_.has(trueItems, item.item_id)) {
+                                            itemsDB.update({item_id: item.item_id}, {...item});
+                                            console.log('Item ' + item.name + ' updated');
+                                        }
+                                        else {
+                                            itemsDB.deleteOne({item_id: item.item_id});
+                                            console.log('Item ' + item.name + ' deleted');
+                                        }
+                                
+                                    } else {
+                                        if(item.name && _.has(trueItems, item.item_id)) {
+                                            itemsDB.insertOne(item, (err, res) => {
+                                                if (err) throw err;
+                                                console.log('Item ' + item.name + ' added to db');
+                                            });
+                                        }
                                     }
-                                }
+                            });
                         });
                     });
                 });
+                
                 riotFetch(mapUrl)
                     .then(({data: maps}) => {
                         _.forEach(maps, (mapData) => {

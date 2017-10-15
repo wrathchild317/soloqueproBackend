@@ -248,16 +248,12 @@ MongoClient.connect(mongoUrl, function (err, db) {
 
     if (err) throw err;
     var realmsDB = db.collection('realms');
+    realmsDB.drop();
     var championsDB = db.collection('champions');
     var itemsDB = db.collection('items');
     var mapsDB = db.collection('maps');
 
     (0, _RiotFetch2.default)('https://ddragon.leagueoflegends.com/realms/na.json').then(function (data) {
-        realmsDB.insertOne(data, function (err, res) {
-            if (err) throw err;
-            console.log("Realms data initialized");
-        });
-
         return data;
     }).then(function (realmData) {
         //get champion info
@@ -276,100 +272,118 @@ MongoClient.connect(mongoUrl, function (err, db) {
 
 
                 var championKey = championData.key == 'Fiddlesticks' ? 'FiddleSticks' : championData.key;
+                (0, _RiotFetch2.default)('https://universe-meeps.leagueoflegends.com/v1/en_us/champions/' + championKey.toLowerCase() + '/index.json').then(function (universeData) {
+                    var _universeData$champio = universeData.champion,
+                        release_date = _universeData$champio['release-date'],
+                        video = _universeData$champio.video;
 
-                (0, _RiotFetch2.default)(cdn + '/' + v + '/data/en_US/champion/' + championKey + '.json').then(function (riotData) {
-                    //create champion square url 
-                    var championSquareUrl = cdn + '/' + n.champion + '/img/champion/' + championData.key + '.png';
+                    (0, _RiotFetch2.default)(cdn + '/' + v + '/data/en_US/champion/' + championKey + '.json').then(function (riotData) {
+                        //create champion square url 
+                        var championSquareUrl = cdn + '/' + n.champion + '/img/champion/' + championData.key + '.png';
 
-                    //create tag image url
-                    var tagImageUrl = 'http://universe.leagueoflegends.com/images/role_icon_' + championData.tags[0].toLowerCase() + '.png';
+                        //create tag image url
+                        var tagImageUrl = 'http://universe.leagueoflegends.com/images/role_icon_' + championData.tags[0].toLowerCase() + '.png';
 
-                    //create spells url
-                    var newSpells = _lodash2.default.map(spells, function (spell) {
-                        var spellUrl = cdn + '/' + n.champion + '/img/spell/' + spell.key + '.png';
+                        //create spells url
+                        var newSpells = _lodash2.default.map(spells, function (spell) {
+                            var spellUrl = cdn + '/' + n.champion + '/img/spell/' + spell.key + '.png';
 
-                        return _extends({}, spell, { spell_url: spellUrl });
+                            return _extends({}, spell, { spell_url: spellUrl });
+                        });
+
+                        //filter out skins that are just color variations
+                        var newSkins = _lodash2.default.filter(skins, function (skin) {
+                            return skin.media;
+                        });
+
+                        //now create new urls
+                        newSkins = _lodash2.default.map(newSkins, function (skin) {
+                            var media = {
+                                splash_url: cdn + '/img/champion/splash/' + championData.key + '_' + skin.num + '.jpg',
+                                loading_url: cdn + '/img/champion/loading/' + championData.key + '_' + skin.num + '.jpg'
+                            };
+
+                            return _extends({}, skin, { media: media });
+                        });
+
+                        //input passive url
+                        var passive = riotData.data[championData.key].passive;
+                        var newPassive = {
+                            name: passive.name,
+                            description: passive.description,
+                            url: cdn + '/' + n.champion + '/img/passive/' + passive.image.full
+
+                            //sanatize blurb and lore 
+
+                        };var sanitizedLore = (0, _striptags2.default)(lore, [], '\n').replace(/['"]+/g, '');
+                        var sanitizedBlurb = (0, _striptags2.default)(blurb, [], '\n').replace(/['"]+/g, '');
+
+                        var champion = _extends({}, championData, {
+                            passive: newPassive,
+                            skins: newSkins,
+                            spells: newSpells,
+                            champion_square_url: championSquareUrl,
+                            lore: sanitizedLore,
+                            blurb: sanitizedBlurb,
+                            tag_image_url: tagImageUrl,
+                            release_date: release_date,
+                            video: video
+                        });
+
+                        championsDB.find({ champion_id: champion.champion_id }).toArray(function (err, championExists) {
+                            if (err) throw err;
+                            if (championExists.length > 0) {
+                                //champion is already in database so update
+                                championsDB.update({ champion_id: champion.champion_id }, _extends({}, champion));
+                                console.log('champion ' + champion.key + ' updated');
+                            } else {
+                                championsDB.insertOne(champion, function (err, res) {
+                                    if (err) throw err;
+                                    console.log('champion ' + champion.key + ' added to db');
+                                });
+                            }
+                        });
+                    });
+                });
+            });
+        });
+        (0, _RiotFetch2.default)('http://ddragon.leagueoflegends.com/cdn/' + n.item + '/data/en_US/item.json').then(function (itemsList) {
+            var trueItems = itemsList.data;
+
+
+            (0, _RiotFetch2.default)('http://loldata.services.zam.com/v1/item').then(function (items) {
+                _lodash2.default.forEach(items, function (itemData) {
+                    var itemSquareUrl = cdn + '/' + n.item + '/img/item/' + itemData.item_id + '.png';
+
+                    var item = _extends({}, itemData, {
+                        item_square_url: itemSquareUrl
                     });
 
-                    //filter out skins that are just color variations
-                    var newSkins = _lodash2.default.filter(skins, function (skin) {
-                        return skin.media;
-                    });
-
-                    //now create new urls
-                    newSkins = _lodash2.default.map(newSkins, function (skin) {
-                        var media = {
-                            splash_url: cdn + '/img/champion/splash/' + championData.key + '_' + skin.num + '.jpg',
-                            loading_url: cdn + '/img/champion/loading/' + championData.key + '_' + skin.num + '.jpg'
-                        };
-
-                        return _extends({}, skin, { media: media });
-                    });
-
-                    //input passive url
-                    var passive = riotData.data[championData.key].passive;
-                    var newPassive = {
-                        name: passive.name,
-                        description: passive.description,
-                        url: cdn + '/' + n.champion + '/img/passive/' + passive.image.full
-
-                        //sanatize blurb and lore 
-
-                    };var sanitizedLore = (0, _striptags2.default)(lore, [], '\n').replace(/['"]+/g, '');
-                    var sanitizedBlurb = (0, _striptags2.default)(blurb, [], '\n').replace(/['"]+/g, '');
-
-                    var champion = _extends({}, championData, {
-                        passive: newPassive,
-                        skins: newSkins,
-                        spells: newSpells,
-                        champion_square_url: championSquareUrl,
-                        lore: sanitizedLore,
-                        blurb: sanitizedBlurb,
-                        tag_image_url: tagImageUrl
-                    });
-
-                    championsDB.find({ champion_id: champion.champion_id }).toArray(function (err, championExists) {
+                    itemsDB.find({ item_id: item.item_id }).toArray(function (err, itemExists) {
                         if (err) throw err;
-                        if (championExists.length > 0) {
+
+                        if (itemExists.length > 0) {
                             //champion is already in database so update
-                            championsDB.update({ champion_id: champion.champion_id }, _extends({}, champion));
-                            console.log('champion ' + champion.key + ' updated');
+                            if (_lodash2.default.has(trueItems, item.item_id)) {
+                                itemsDB.update({ item_id: item.item_id }, _extends({}, item));
+                                console.log('Item ' + item.name + ' updated');
+                            } else {
+                                itemsDB.deleteOne({ item_id: item.item_id });
+                                console.log('Item ' + item.name + ' deleted');
+                            }
                         } else {
-                            championsDB.insertOne(champion, function (err, res) {
-                                if (err) throw err;
-                                console.log('champion ' + champion.key + ' added to db');
-                            });
+                            if (item.name && _lodash2.default.has(trueItems, item.item_id)) {
+                                itemsDB.insertOne(item, function (err, res) {
+                                    if (err) throw err;
+                                    console.log('Item ' + item.name + ' added to db');
+                                });
+                            }
                         }
                     });
                 });
             });
         });
-        (0, _RiotFetch2.default)('http://loldata.services.zam.com/v1/item').then(function (items) {
-            _lodash2.default.forEach(items, function (itemData) {
-                var itemSquareUrl = cdn + '/' + n.item + '/img/item/' + itemData.item_id + '.png';
 
-                var item = _extends({}, itemData, {
-                    item_square_url: itemSquareUrl
-                });
-
-                itemsDB.find({ item_id: item.item_id }).toArray(function (err, itemExists) {
-                    if (err) throw err;
-
-                    if (itemExists.length > 0) {
-                        //champion is already in database so update
-                        itemsDB.update({ item_id: item.item_id }, _extends({}, item));
-                        console.log('Item ' + item.name + ' updated');
-                    } else {
-                        if (item.name) {
-                            itemsDB.insertOne(item, function (err, res) {
-                                if (err) throw err;
-                                console.log('Item ' + item.name + ' added to db');
-                            });
-                        }
-                    }
-                });
-            });
-        });
         (0, _RiotFetch2.default)(mapUrl).then(function (_ref) {
             var maps = _ref.data;
 
