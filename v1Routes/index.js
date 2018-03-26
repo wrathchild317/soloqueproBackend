@@ -1,6 +1,6 @@
 import express from 'express';
 
-/*import all routes that will be used here*/
+/* import all routes that will be used here */
 // import summonerv3Router from './SummonerRoute';
 // import championv3Router from './ChampionRoute';
 // import championMasteryv3Router from './ChampionMasteryRoute';
