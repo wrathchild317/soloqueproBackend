@@ -1,6 +1,7 @@
 import express from 'express';
 import http from 'http';
 import socketio from 'socket.io';
+import bodyParser from 'body-parser';
 
 import promise from 'es6-promise';
 import fetch from 'isomorphic-fetch';
@@ -14,8 +15,9 @@ import _ from 'lodash';
 import striptags from 'striptags';
 import configs from './configs';
 
+import v1Routes from './v1Routes';
 
-
+import paths from './paths';
 //SET TRUE FOR TESTING
 var testing = false;
 
@@ -24,192 +26,188 @@ var app = express();
 var server = http.createServer(app);
 var io = socketio.listen(server);
 var port = process.env.PORT || 3000;
-var testPort = 8081;
+var chosenPort = 8080;
+// var testPort = 8081;
 var url = 'http://localhost:' + port + '/';
 promise.polyfill();
 
 
-
-
 var MongoClient = require('mongodb').MongoClient;
-var mongoUrl = "mongodb://heroku_vxl19zxq:ea20n6rfisqse45k3nqf7hpu56@ds157624.mlab.com:57624/heroku_vxl19zxq";
-var testUrl = "mongodb://localhost:27017/soloqueproTestDB";
+var mongoUrl = paths.mongoUrl;
+// var testUrl = "mongodb://localhost:27017/soloqueproTestDB";
 
 if (testing) {
     port = testPort;
     mongoUrl = testUrl;
 }
 
+app.use(bodyParser.urlencoded({
+    extended: true
+}));
 
-MongoClient.connect(mongoUrl, (err, db) => {
-    server.listen(port, function(error) {
-        if (error) {
-          console.error("Unable to listen on port", port, error);
-          listen(port + 1);
-        } else{
-          console.log("Express server listening on port " + port);
-          console.log(url);
-        }
-        return;
-    });
+app.use(bodyParser.json());
 
-    app.get('/', (req, res) => {
-        res.json({
-          greeting: 'Welcome to SoloQuePro!'
-        });
-    });
+app.use('/soloquepro/v1', v1Routes);
 
-
-    app.get(RiotAPI.apis.staticDatav3.getChampionById.url, (req, res) => {
-        const { fields } = req.query;
-
-        var championFields = (fields) ? fields.split(',') : {};
-
-        championFields = _.reduce(championFields, (acc, field) => {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-        var championId = parseInt(req.params.championId);
-
-        db.collection('champions').findOne({champion_id: championId,}, championFields, (err, champion) => {
-            if (err) throw err;
-            (champion) ? res.json(champion) :  res.status(500).send('Champion Not Found');
-        });
-
-    });
-
-    app.get(RiotAPI.apis.staticDatav3.getAllChampions.url, (req, res) => {
-        const { fields, in_rotation, sort } = req.query;
-
-
-        var query = (in_rotation) ? {in_rotation: in_rotation === 'true'} : {};
-        var championFields = (fields) ? fields.split(',') : [];
-        var sortFields = (sort) ? sort.split(',') : [];
-
-        championFields = _.reduce(championFields, (acc, field) => {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-        sortFields = _.reduce(sortFields, (acc, field) => {
-            if(field.charAt(0) == '-') {
-                field = field.substr(1);
-                acc[field] = -1;
-            } else {
-                acc[field] = 1;
-            }
-            return acc;
-        }, {});
-
-        db.collection('champions').find(query, championFields). sort(sortFields)
-            .toArray((err, champions) => {
-                if (err) throw err;
-                (champions) ? res.json(champions) :  res.status(500).send('Internal Server Error');
-            });
-
-    });
-
-    app.get(RiotAPI.apis.staticDatav3.getAllItems.url, (req, res) => {
-        const { fields, sort, map } = req.query;
-
-        var itemFields = (fields) ? fields.split(',') : [];
-        var sortFields = (sort) ? sort.split(',') : [];
-        var mapQuery = {};
-
-        (map) ? mapQuery['maps.' + map] = true : null;
-
-        itemFields = _.reduce(itemFields, (acc, field) => {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-        sortFields = _.reduce(sortFields, (acc, field) => {
-            if(field.charAt(0) == '-') {
-                field = field.substr(1);
-                acc[field] = -1;
-            } else {
-                acc[field] = 1;
-            }
-            return acc;
-        }, {});
-
-        db.collection('items').find(mapQuery, itemFields).sort(sortFields)
-            .toArray((err, items) => {
-                if (err) throw err;
-                (items) ? res.json(items) :  res.status(500).send('Internal Server Error');
-            });
-
-    });
-
-    app.get(RiotAPI.apis.staticDatav3.getItemById.url, (req, res) => {
-        const { fields } = req.query;
-
-        var itemFields = (fields) ? fields.split(',') : [];
-
-        itemFields = _.reduce(itemFields, (acc, field) => {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-
-        var itemId = parseInt(req.params.itemId);
-        db.collection('items').findOne({item_id: itemId,}, itemFields, (err, item) => {
-            if (err) throw err;
-            (item) ? res.json(item) :  res.status(500).send('Item Not Found');
-        });
-
-    });
-
-    app.get(RiotAPI.apis.staticDatav3.getAllMaps.url, (req, res) => {
-        const { fields, sort, map } = req.query;
-
-        var mapFields = (fields) ? fields.split(',') : [];
-        var sortFields = (sort) ? sort.split(',') : [];
-
-        mapFields = _.reduce(mapFields, (acc, field) => {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-        sortFields = _.reduce(sortFields, (acc, field) => {
-            if(field.charAt(0) == '-') {
-                field = field.substr(1);
-                acc[field] = -1;
-            } else {
-                acc[field] = 1;
-            }
-            return acc;
-        }, {});
-
-        db.collection('maps').find({}, mapFields).sort(sortFields)
-            .toArray((err, maps) => {
-                if (err) throw err;
-                (maps) ? res.json(maps) :  res.status(500).send('Internal Server Error');
-            });
-
-    });
-
-    app.get(RiotAPI.apis.staticDatav3.getMapById.url, (req, res) => {
-        const { fields } = req.query;
-
-        var mapFields = (fields) ? fields.split(',') : [];
-
-        mapFields = _.reduce(mapFields, (acc, field) => {
-            acc[field] = true;
-            return acc;
-        }, {});
-
-
-        var mapId = req.params.mapId;
-        db.collection('maps').findOne({MapId: mapId,}, mapFields, (err, map) => {
-            if (err) throw err;
-            (map) ? res.json(map) :  res.status(500).send('Map Not Found');
-        });
-
-    });
+app.listen(chosenPort, function(){
+    console.log('Server listening on port ' + chosenPort + '!');
 });
 
+/* --------------------- HAS BEEN MOVED TO STATICDATAROUTE ----------------- */
+
+// MongoClient.connect(mongoUrl, (err, db) => {
+
+//     app.get(RiotAPI.apis.staticDatav3.getChampionById.url, (req, res) => {
+//         const { fields } = req.query;
+
+//         var championFields = (fields) ? fields.split(',') : {};
+
+//         championFields = _.reduce(championFields, (acc, field) => {
+//             acc[field] = true;
+//             return acc;
+//         }, {});
+
+//         var championId = parseInt(req.params.championId);
+
+//         db.collection('champions').findOne({champion_id: championId,}, championFields, (err, champion) => {
+//             if (err) throw err;
+//             (champion) ? res.json(champion) :  res.status(500).send('Champion Not Found');
+//         });
+
+//     });
+
+//     app.get(RiotAPI.apis.staticDatav3.getAllChampions.url, (req, res) => {
+//         const { fields, in_rotation, sort } = req.query;
+
+
+//         var query = (in_rotation) ? {in_rotation: in_rotation === 'true'} : {};
+//         var championFields = (fields) ? fields.split(',') : [];
+//         var sortFields = (sort) ? sort.split(',') : [];
+
+//         championFields = _.reduce(championFields, (acc, field) => {
+//             acc[field] = true;
+//             return acc;
+//         }, {});
+
+//         sortFields = _.reduce(sortFields, (acc, field) => {
+//             if(field.charAt(0) == '-') {
+//                 field = field.substr(1);
+//                 acc[field] = -1;
+//             } else {
+//                 acc[field] = 1;
+//             }
+//             return acc;
+//         }, {});
+
+//         db.collection('champions').find(query, championFields). sort(sortFields)
+//             .toArray((err, champions) => {
+//                 if (err) throw err;
+//                 (champions) ? res.json(champions) :  res.status(500).send('Internal Server Error');
+//             });
+
+//     });
+
+//     app.get(RiotAPI.apis.staticDatav3.getAllItems.url, (req, res) => {
+//         const { fields, sort, map } = req.query;
+
+//         var itemFields = (fields) ? fields.split(',') : [];
+//         var sortFields = (sort) ? sort.split(',') : [];
+//         var mapQuery = {};
+
+//         (map) ? mapQuery['maps.' + map] = true : null;
+
+//         itemFields = _.reduce(itemFields, (acc, field) => {
+//             acc[field] = true;
+//             return acc;
+//         }, {});
+
+//         sortFields = _.reduce(sortFields, (acc, field) => {
+//             if(field.charAt(0) == '-') {
+//                 field = field.substr(1);
+//                 acc[field] = -1;
+//             } else {
+//                 acc[field] = 1;
+//             }
+//             return acc;
+//         }, {});
+
+//         db.collection('items').find(mapQuery, itemFields).sort(sortFields)
+//             .toArray((err, items) => {
+//                 if (err) throw err;
+//                 (items) ? res.json(items) :  res.status(500).send('Internal Server Error');
+//             });
+
+//     });
+
+//     app.get(RiotAPI.apis.staticDatav3.getItemById.url, (req, res) => {
+//         const { fields } = req.query;
+
+//         var itemFields = (fields) ? fields.split(',') : [];
+
+//         itemFields = _.reduce(itemFields, (acc, field) => {
+//             acc[field] = true;
+//             return acc;
+//         }, {});
+
+
+//         var itemId = parseInt(req.params.itemId);
+//         db.collection('items').findOne({item_id: itemId,}, itemFields, (err, item) => {
+//             if (err) throw err;
+//             (item) ? res.json(item) :  res.status(500).send('Item Not Found');
+//         });
+
+//     });
+
+//     app.get(RiotAPI.apis.staticDatav3.getAllMaps.url, (req, res) => {
+//         const { fields, sort, map } = req.query;
+
+//         var mapFields = (fields) ? fields.split(',') : [];
+//         var sortFields = (sort) ? sort.split(',') : [];
+
+//         mapFields = _.reduce(mapFields, (acc, field) => {
+//             acc[field] = true;
+//             return acc;
+//         }, {});
+
+//         sortFields = _.reduce(sortFields, (acc, field) => {
+//             if(field.charAt(0) == '-') {
+//                 field = field.substr(1);
+//                 acc[field] = -1;
+//             } else {
+//                 acc[field] = 1;
+//             }
+//             return acc;
+//         }, {});
+
+//         db.collection('maps').find({}, mapFields).sort(sortFields)
+//             .toArray((err, maps) => {
+//                 if (err) throw err;
+//                 (maps) ? res.json(maps) :  res.status(500).send('Internal Server Error');
+//             });
+
+//     });
+
+//     app.get(RiotAPI.apis.staticDatav3.getMapById.url, (req, res) => {
+//         const { fields } = req.query;
+
+//         var mapFields = (fields) ? fields.split(',') : [];
+
+//         mapFields = _.reduce(mapFields, (acc, field) => {
+//             acc[field] = true;
+//             return acc;
+//         }, {});
+
+
+//         var mapId = req.params.mapId;
+//         db.collection('maps').findOne({MapId: mapId,}, mapFields, (err, map) => {
+//             if (err) throw err;
+//             (map) ? res.json(map) :  res.status(500).send('Map Not Found');
+//         });
+
+//     });
+// });
+
+/* --------------------- HAS BEEN MOVED TO STATICDATAROUTE ----------------- */
 
 MongoClient.connect(mongoUrl, (err, db) => {
 
